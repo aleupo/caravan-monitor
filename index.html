@@ -3,118 +3,100 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Bluetooth Example</title>
+    <title>Web Bluetooth with Notifications</title>
     <style>
         body {
-            font-family: 'Arial', sans-serif;
-            background: linear-gradient(to right, #4facfe, #00f2fe);
-            color: #fff;
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             height: 100vh;
             margin: 0;
         }
-        
-        .container {
-            text-align: center;
-            background: rgba(0, 0, 0, 0.4);
-            padding: 40px;
-            border-radius: 15px;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-        }
-
         h1 {
-            font-size: 2rem;
-            margin-bottom: 20px;
+            color: #2c3e50;
         }
-
-        #connectButton {
-            background-color: #ff5722;
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #3498db;
             color: #fff;
             border: none;
-            padding: 15px 30px;
-            border-radius: 10px;
-            font-size: 1.2rem;
+            border-radius: 5px;
             cursor: pointer;
-            transition: background 0.3s;
         }
-
-        #connectButton:hover {
-            background-color: #e64a19;
+        button:hover {
+            background-color: #2980b9;
         }
-
         p {
-            font-size: 1.1rem;
+            font-size: 18px;
             margin-top: 20px;
-        }
-
-        #output {
-            margin-top: 20px;
-            padding: 10px;
-            background-color: rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            font-size: 1.3rem;
-        }
-
-        .footer {
-            margin-top: 40px;
-            font-size: 0.9rem;
-            color: rgba(255, 255, 255, 0.6);
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Connect to your Bluetooth Device</h1>
-        <button id="connectButton">Connect and Read</button>
-        <p id="output">Output will be shown here...</p>
-        <div class="footer">Web Bluetooth Example © 2024</div>
-    </div>
+    <h1>Web Bluetooth: Notifications Example</h1>
+    <button id="connectButton">Connect and Read</button>
+    <p id="output">Output will appear here...</p>
 
     <script>
         document.getElementById('connectButton').addEventListener('click', async () => {
             try {
-                // Definiere die Service UUID und die Characteristic UUIDs
-                const serviceUuid = '2d37d6fb-e0f0-438e-8000-81d083939a53'; // UUID des Services
-                const rollCharacteristicUuid = '0816c871-b3a1-4fd3-85aa-20218cf894d9'; // UUID für Roll
-                const pitchCharacteristicUuid = '85a00908-8fbb-4c40-bdc6-a37c59ea89ac'; // UUID für Pitch (Notify)
-
-                // Fordere den Benutzer auf, ein BLE-Gerät auszuwählen
+                // UUID der BLE-Service und Characteristic
+                const serviceUuid = '2d37d6fb-e0f0-438e-8000-81d083939a53'; // Beispielservice
+                const characteristicUuid = '85a00908-8fbb-4c40-bdc6-a37c59ea89ac'; // Beispielcharacteristic für Notify
+                
+                // Verbindung zu einem BLE-Gerät
                 const device = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
                     optionalServices: [serviceUuid]
                 });
-
-                // Verbinde dich mit dem Gerät
+                
                 const server = await device.gatt.connect();
-
-                // Finde den Primary Service
                 const service = await server.getPrimaryService(serviceUuid);
+                const characteristic = await service.getCharacteristic(characteristicUuid);
 
-                // Lese den Roll-Wert aus der Characteristic
-                const rollCharacteristic = await service.getCharacteristic(rollCharacteristicUuid);
-                const rollValue = await rollCharacteristic.readValue();
-                const decoder = new TextDecoder('utf-8');
-                const decodedRollValue = decoder.decode(rollValue);
-                document.getElementById('output').textContent = `Roll Value: ${decodedRollValue}`;
+                // Aktiviere Notifications für die Characteristic
+                await characteristic.startNotifications();
+                characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
+                
+                document.getElementById('output').textContent = 'Connected and listening for notifications...';
 
-                // Abonniere Benachrichtigungen für Pitch-Characteristic
-                const pitchCharacteristic = await service.getCharacteristic(pitchCharacteristicUuid);
-                await pitchCharacteristic.startNotifications();
-                pitchCharacteristic.addEventListener('characteristicvaluechanged', (event) => {
-                    const value = event.target.value;
-                    const decodedPitchValue = decoder.decode(value);
-                    console.log(`Pitch Value: ${decodedPitchValue}`);
-                    // Zeige den Benachrichtigungswert an
-                    document.getElementById('output').textContent += ` | Pitch Notification: ${decodedPitchValue}`;
-                });
-                console.log('Notifications started for pitch characteristic.');
             } catch (error) {
-                console.error('Es gab einen Fehler:', error);
-                document.getElementById('output').textContent = 'Fehler: ' + error;
+                console.error('Error:', error);
+                document.getElementById('output').textContent = 'Error: ' + error;
             }
         });
+
+        function handleCharacteristicValueChanged(event) {
+            const value = event.target.value;
+            const decoder = new TextDecoder('utf-8');
+            const decodedValue = decoder.decode(value);
+            document.getElementById('output').textContent = `Notification: ${decodedValue}`;
+
+            // Web Notification mit Vibration und Icon (für Android)
+            if (Notification.permission === 'granted') {
+                new Notification("BLE Notification", {
+                    body: `Received: ${decodedValue}`,
+                    icon: 'https://via.placeholder.com/80x80.png?text=BLE', // Beispielicon
+                    vibrate: [200, 100, 200] // Vibriermuster
+                });
+            } else if (Notification.permission !== 'denied') {
+                // Berechtigung anfordern, falls noch nicht erteilt
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        new Notification("BLE Notification", {
+                            body: `Received: ${decodedValue}`,
+                            icon: 'https://via.placeholder.com/80x80.png?text=BLE',
+                            vibrate: [200, 100, 200]
+                        });
+                    }
+                });
+            }
+        }
     </script>
 </body>
 </html>
