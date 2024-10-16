@@ -3,99 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Bluetooth with Notifications</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f9;
-            color: #333;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
-        h1 {
-            color: #2c3e50;
-        }
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            background-color: #3498db;
-            color: #fff;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #2980b9;
-        }
-        p {
-            font-size: 18px;
-            margin-top: 20px;
-        }
-    </style>
+    <title>Web Bluetooth Notification Example</title>
 </head>
 <body>
-    <h1>Web Bluetooth: Notifications Example</h1>
-    <button id="connectButton">Connect and Read</button>
-    <p id="output">Output will appear here...</p>
+    <h1>Web Bluetooth: Notify Characteristic</h1>
+    <button id="connectButton">Connect and Subscribe</button>
+    <p id="output"></p>
 
     <script>
         document.getElementById('connectButton').addEventListener('click', async () => {
             try {
-                // UUID der BLE-Service und Characteristic
-                const serviceUuid = '2d37d6fb-e0f0-438e-8000-81d083939a53'; // Beispielservice
-                const characteristicUuid = '85a00908-8fbb-4c40-bdc6-a37c59ea89ac'; // Beispielcharacteristic für Notify
-                
-                // Verbindung zu einem BLE-Gerät
+                // Definiere die UUID der Notify Characteristic
+                const serviceUuid = '2d37d6fb-e0f0-438e-8000-81d083939a53';  // UUID für den Service
+                const characteristicUuid = '85a00908-8fbb-4c40-bdc6-a37c59ea89ac';  // UUID für die Notify Characteristic
+
+                // Fordere den Benutzer auf, ein BLE-Gerät auszuwählen
                 const device = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
                     optionalServices: [serviceUuid]
                 });
-                
+
+                // Verbinde dich mit dem Gerät
                 const server = await device.gatt.connect();
+
+                // Finde den Primary Service
                 const service = await server.getPrimaryService(serviceUuid);
+
+                // Finde die Notify Characteristic
                 const characteristic = await service.getCharacteristic(characteristicUuid);
 
-                // Aktiviere Notifications für die Characteristic
+                // Benachrichtigungen aktivieren
                 await characteristic.startNotifications();
-                characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
-                
-                document.getElementById('output').textContent = 'Connected and listening for notifications...';
+                characteristic.addEventListener('characteristicvaluechanged', handleNotifications);
 
+                // Output-Text aktualisieren
+                document.getElementById('output').textContent = 'Subscribed to notifications...';
             } catch (error) {
-                console.error('Error:', error);
-                document.getElementById('output').textContent = 'Error: ' + error;
+                console.error('Es gab einen Fehler:', error);
+                document.getElementById('output').textContent = 'Fehler: ' + error;
             }
         });
 
-        function handleCharacteristicValueChanged(event) {
+        // Callback-Funktion für Benachrichtigungen
+        function handleNotifications(event) {
             const value = event.target.value;
             const decoder = new TextDecoder('utf-8');
             const decodedValue = decoder.decode(value);
+
+            // Zeige den Wert auf der Webseite an
             document.getElementById('output').textContent = `Notification: ${decodedValue}`;
 
-            // Web Notification mit Vibration und Icon (für Android)
-            if (Notification.permission === 'granted') {
+            // Prüfe, ob die Notifications-API unterstützt wird und zeige eine Web-Benachrichtigung an
+            if (Notification.permission === "granted") {
                 new Notification("BLE Notification", {
-                    body: `Received: ${decodedValue}`,
-                    icon: 'https://via.placeholder.com/80x80.png?text=BLE', // Beispielicon
-                    vibrate: [200, 100, 200] // Vibriermuster
-                });
-            } else if (Notification.permission !== 'denied') {
-                // Berechtigung anfordern, falls noch nicht erteilt
-                Notification.requestPermission().then(permission => {
-                    if (permission === 'granted') {
-                        new Notification("BLE Notification", {
-                            body: `Received: ${decodedValue}`,
-                            icon: 'https://via.placeholder.com/80x80.png?text=BLE',
-                            vibrate: [200, 100, 200]
-                        });
-                    }
+                    body: decodedValue
                 });
             }
+        }
+
+        // Frage nach Berechtigung für Web Notifications
+        if (Notification.permission !== "granted") {
+            Notification.requestPermission();
         }
     </script>
 </body>
